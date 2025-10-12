@@ -82,31 +82,3 @@ jobs:
           name: ayugram-desktop ${{ env.AUR_VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cleanup old releases
-        if: ${{ always() }}
-        run: |
-          GH_REPO="${{ github.repository }}"
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
-
-          releases=$(curl -s -H "Authorization: token $TOKEN" \
-            "https://api.github.com/repos/$GH_REPO/releases?per_page=100" \
-            | jq -r '.[].tag_name')
-
-          count=0
-          for tag in $releases; do
-            count=$((count + 1))
-            if [ $count -le 3 ]; then
-              echo "Keeping $tag"
-              continue
-            fi
-            release_id=$(curl -s -H "Authorization: token $TOKEN" \
-              "https://api.github.com/repos/$GH_REPO/releases/tags/$tag" | jq -r '.id')
-
-            if [ "$release_id" != "null" ]; then
-              curl -s -X DELETE -H "Authorization: token $TOKEN" \
-                "https://api.github.com/repos/$GH_REPO/releases/$release_id"
-            fi
-            curl -s -X DELETE -H "Authorization: token $TOKEN" \
-              "https://api.github.com/repos/$GH_REPO/git/refs/tags/$tag" || true
-          done
