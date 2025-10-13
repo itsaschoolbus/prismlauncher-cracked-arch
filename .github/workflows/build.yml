@@ -81,8 +81,7 @@ jobs:
           git remote set-url origin "https://itsaschoolbus:${{ secrets.GITHUB_TOKEN }}@github.com/itsaschoolbus/ayugram-arch.git"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm *
-          git restore README.md
+          rm *ayugram*
           cp ../pkg/* .
           rm *debug*
           repo-add ayugram.db.tar.gz *zst
