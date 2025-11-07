@@ -51,19 +51,19 @@ jobs:
           curl -fsSL https://get.docker.com -o install-docker.sh
           sudo sh install-docker.sh
           sudo systemctl start docker
-          docker run --rm -v $(pwd):/share archlinux:latest bash -euxc '
+          docker run --rm -v $(pwd):/share archlinux:latest bash -euxc "
             pacman-key --init && pacman-key --populate archlinux
             pacman -Syu --noconfirm base-devel git sudo curl jq vulkan-headers openssl ca-certificates fmt coreutils
             yes | pacman -Scc
 
-            useradd -m builder && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
-            sed -i '/^OPTIONS=/ s/\bdebug\b/!debug/' /etc/makepkg.conf
+            useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+            sed -i '/^OPTIONS=/ s/\\bdebug\\b/!debug/' /etc/makepkg.conf
 
-            sudo -u builder bash -c "
+            sudo -u builder bash -c '
               git config --global http.sslBackend "openssl"
               cd ~ && git clone https://aur.archlinux.org/ayugram-desktop.git
               cd ayugram-desktop && makepkg -s --noconfirm
-            "
+            '
 
             mkdir -p /share/pkg
             cp /home/builder/ayugram-desktop/*.pkg.tar.* /share/pkg/
@@ -73,7 +73,7 @@ jobs:
             git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
             rm *ayugram* && cp /share/pkg/* . && repo-add ayugram.db.tar.gz *zst
             git add . && git commit -m "ayugram-desktop ${{ env.AUR_VERSION }}" && git push
-          '
+          "
 
       - name: Upload to releases
         uses: softprops/action-gh-release@master
