@@ -19,8 +19,9 @@ jobs:
       - name: Check AUR version
         id: aur
         run: |
+          set -euo pipefail
           AUR_URL="https://aur.archlinux.org/rpc/?v=5&type=info&arg=ayugram-desktop"
-          AUR_VER=$(curl -s "$AUR_URL" | jq -r ".results[0].Version")
+          AUR_VER=$(curl -fsSL "$AUR_URL" | jq -r ".results[0].Version")
           echo "version=$AUR_VER" >> $GITHUB_OUTPUT
           echo "AUR_VER=$AUR_VER" >> $GITHUB_ENV
 
