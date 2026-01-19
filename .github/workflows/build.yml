@@ -47,7 +47,7 @@ jobs:
           sudo systemctl start docker
           docker run --rm -v $(pwd):/share archlinux:latest bash -euxc "
             pacman-key --init && pacman-key --populate archlinux
-            pacman -Syu --noconfirm base-devel git sudo curl jq vulkan-headers openssl ca-certificates fmt coreutils jdk17-openjdk
+            pacman -Syu --noconfirm base-devel git sudo curl jq vulkan-headers openssl ca-certificates fmt coreutils jdk17-openjdk pacman-contrib
             yes | pacman -Scc
             useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
             sed -i '/^OPTIONS=/ s/\\bdebug\\b/!debug/' /etc/makepkg.conf
