@@ -1,0 +1,28 @@
+From d7829945458bef3b85f8dece3258c31762a8fe27 Mon Sep 17 00:00:00 2001
+From: Diegiwg <diegiwg@gmail.com>
+Date: Wed, 14 Jan 2026 20:36:21 -0300
+Subject: [PATCH] fix: update AccountList::anyAccountIsValid to always return
+ true
+
+---
+ launcher/minecraft/auth/AccountList.cpp | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/launcher/minecraft/auth/AccountList.cpp b/launcher/minecraft/auth/AccountList.cpp
+index cef79d200a..57a0cf7ca2 100644
+--- a/launcher/minecraft/auth/AccountList.cpp
++++ b/launcher/minecraft/auth/AccountList.cpp
+@@ -561,12 +561,7 @@ void AccountList::setListFilePath(QString path, bool autosave)
+ 
+ bool AccountList::anyAccountIsValid()
+ {
+-    for (auto account : m_accounts) {
+-        if (account->ownsMinecraft()) {
+-            return true;
+-        }
+-    }
+-    return false;
++    return true;
+ }
+ 
+ void AccountList::fillQueue()

@@ -1,68 +1,12 @@
-name: Build AyuGram Desktop
+name: Build Prism Launcher (with patches)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * 1,3,5"
 
 jobs:
-  version:
-    name: Check package version
-    runs-on: ubuntu-latest
-    outputs:
-      aur: ${{ steps.aur.outputs.version }}
-      continue_build: ${{ steps.continue_build.outputs.continue_build }}
-    steps:
-      - name: Check AUR version
-        id: aur
-        run: |
-          set -euo pipefail
-          AUR_URL="https://aur.archlinux.org/rpc/?v=5&type=info&arg=ayugram-desktop"
-          AUR_VER=$(curl -fsSL "$AUR_URL" | jq -r ".results[0].Version")
-          echo "version=$AUR_VER" >> $GITHUB_OUTPUT
-          echo "AUR_VER=$AUR_VER" >> $GITHUB_ENV
-
-      - name: Check latest tag
-        run: |
-          LATEST_TAG=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r .tag_name)
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-
-      - name: Check if build should continue
-        id: continue_build
-        run: |
-          if [ "${{ env.LATEST_TAG }}" = "v${{ env.AUR_VER }}" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
-            echo "continue_build=false" >> $GITHUB_OUTPUT
-          fi
-
-  clear_runs:
-    needs: version
-    if: ${{ needs.version.outputs.continue_build != 'true' }}
-    name: Clear old runs
-    runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    permissions:
-      actions: write
-    steps:
-      - name: Clear old build runs
-        run: |
-          IDS=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml/runs?per_page=100&status=completed" \
-            --paginate \
-            --jq '.workflow_runs[] | 
-                  select(((.updated_at | fromdateiso8601) - (.run_started_at | fromdateiso8601)) < 1800) | 
-                  .id')
-          for ID in $IDS; do
-            echo "Deleting run $ID"
-            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$ID"
-          done
-
   build:
-    needs: version
-    if: ${{ needs.version.outputs.continue_build != 'false' }}
     name: Build package
     runs-on: ubuntu-latest
-    env:
-      AUR_VER: ${{ needs.version.outputs.aur }}
     permissions:
       contents: write
     steps:
@@ -85,6 +29,14 @@ jobs:
         with:
           swap-size-gb: 8
 
+      - name: Check latest tag
+        run: |
+          echo "URL=https://gitlab.archlinux.org/archlinux/packaging/packages/prismlauncher.git" >> $GITHUB_ENV
+          PROJECT_PATH=$(echo "archlinux/packaging/packages/prismlauncher" | sed -e 's/\//%2F/g')
+          LATEST_TAG=$(curl -s "https://gitlab.archlinux.org/api/v4/projects/${PROJECT_PATH}/repository/tags" | jq -r '.[0].name')
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(TZ=UTC date "+%Y%m%d%H%M")" >> $GITHUB_ENV
+
       - name: Build package
         run: |
           curl -fsSL https://get.docker.com -o install-docker.sh
@@ -92,28 +44,19 @@ jobs:
           sudo systemctl start docker
           docker run --rm -v $(pwd):/share archlinux:latest bash -euxc "
             pacman-key --init && pacman-key --populate archlinux
-            pacman -Syu --noconfirm base-devel git sudo curl jq vulkan-headers openssl ca-certificates fmt coreutils
+            pacman -Syu --noconfirm base-devel git sudo curl jq vulkan-headers openssl ca-certificates fmt coreutils jdk17-openjdk
             yes | pacman -Scc
-
             useradd -m builder && echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
             sed -i '/^OPTIONS=/ s/\\bdebug\\b/!debug/' /etc/makepkg.conf
-
-            sudo -u builder bash -c 'git config --global http.sslBackend "openssl" && cd ~ && git clone https://aur.archlinux.org/ayugram-desktop.git && cd ayugram-desktop && makepkg -s --noconfirm'
-
-            mkdir -p /share/pkg
-            cp /home/builder/ayugram-desktop/*.pkg.tar.* /share/pkg/
-            cd ~ && git clone https://github.com/itsaschoolbus/ayugram-arch.git repo && cd repo
-            git remote set-url origin 'https://itsaschoolbus:${{ secrets.GITHUB_TOKEN }}@github.com/itsaschoolbus/ayugram-arch.git'
-            git config --global user.name 'github-actions[bot]' && git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            rm *ayugram* && cp /share/pkg/* . && repo-add ayugram.db.tar.gz *zst
-            git add . && git commit -m 'ayugram-desktop ${{ env.AUR_VER }}' && git push
+            sudo -u builder bash -c 'git config --global http.sslBackend "openssl" && cd ~ && git clone ${{ env.URL }} && cd prismlauncher && cp /share/patches/* . && ./apply.sh && updpkgsums && makepkg -s --noconfirm'
+            mkdir -p /share/pkg && cp /home/builder/prismlauncher/*.pkg.tar.* /share/pkg/
           "
 
       - name: Upload to releases
         uses: softprops/action-gh-release@master
         with:
           files: pkg/*.pkg.tar.*
-          tag_name: v${{ env.AUR_VER }}
-          name: ayugram-desktop ${{ env.AUR_VER }}
+          tag_name: ${{ env.LATEST_TAG }}-${{ env.BUILD_TIME }}
+          name: prismlauncher-${{ env.LATEST_TAG }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
