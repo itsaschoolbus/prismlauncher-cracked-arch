@@ -4,30 +4,17 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build package
+  build-arch:
+    name: Build package (Arch Linux)
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Free disk space (1/3)
+      - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
           sudo docker builder prune -a
-
-      - name: Free disk space (2/3)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-
-      - name: Free disk space (3/3)
-        uses: rokibhasansagar/slimhub_actions@main
-
-      - name: Set swap to 8 GB
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 8
 
       - name: Check latest tag
         run: |
@@ -35,7 +22,7 @@ jobs:
           PROJECT_PATH=$(echo "archlinux/packaging/packages/prismlauncher" | sed -e 's/\//%2F/g')
           LATEST_TAG=$(curl -s "https://gitlab.archlinux.org/api/v4/projects/${PROJECT_PATH}/repository/tags" | jq -r '.[0].name')
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-          echo "BUILD_TIME=$(TZ=UTC date "+%Y%m%d%H%M")" >> $GITHUB_ENV
+          echo "BUILD_TIME=$(date "+%Y%m%d")" >> $GITHUB_ENV
 
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -59,6 +46,41 @@ jobs:
         uses: softprops/action-gh-release@master
         with:
           files: pkg/*.pkg.tar.*
+          tag_name: ${{ env.LATEST_TAG }}-${{ env.BUILD_TIME }}
+          name: prismlauncher-${{ env.LATEST_TAG }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-ubuntu:
+    name: Build package (Ubuntu)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo docker builder prune -a
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build package
+        run: |
+          echo "BUILD_TIME=$(date "+%Y%m%d")" >> $GITHUB_ENV
+          PROJECT_PATH=$(echo "archlinux/packaging/packages/prismlauncher" | sed -e 's/\//%2F/g')
+          LATEST_TAG=$(curl -s "https://gitlab.archlinux.org/api/v4/projects/${PROJECT_PATH}/repository/tags" | jq -r '.[0].name')
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          sudo bash -c "$(curl -fsSL https://pacstall.dev/q/install || wget -q https://pacstall.dev/q/install -O -)"
+          sudo apt install build-essential cmake ninja-build extra-cmake-modules pkg-config scdoc qt6-base-dev qt6-image-formats-plugins qt6-networkauth-dev qt6-svg-dev cmark gamemode-dev libarchive-dev libcmark-dev libgl1-mesa-dev libqrencode-dev libtomlplusplus-dev zlib1g-dev openjdk-17-jdk
+          cd pacstall
+          sudo pacstall -I prismlauncher.pacscript --nosandbox
+
+      - name: Upload to releases
+        uses: softprops/action-gh-release@master
+        with:
+          files: /usr/src/pacstall/prismlauncher*.deb
           tag_name: ${{ env.LATEST_TAG }}-${{ env.BUILD_TIME }}
           name: prismlauncher-${{ env.LATEST_TAG }}
         env:
